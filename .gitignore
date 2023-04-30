@@ -3,6 +3,10 @@
 preprocess/inputs/*
 preprocess/outputs/*
 preprocess/styles/*
+preprocess/dataset/*
+preprocess/test-outputs/*
+preprocess/test-inputs/*
+model/ckpts/*
 
 ### macOS ###
 # General
