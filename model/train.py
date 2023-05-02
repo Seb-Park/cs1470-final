@@ -10,12 +10,12 @@ import matplotlib.pyplot as plt
 INPUTS_DIR = "../preprocess/inputs"
 IMAGE_DIM = (150, 100, 3) # 3 color channels
 LEARNING_RATE = 1e-3
-EPOCHS = 5
+EPOCHS = 2
 
-def load_images(directory, batch_size=16):
+def load_images(directory, batch_size=64):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.9, subset='training', color_mode='rgb' # change this to the full dataset later
+        seed=42, validation_split=0.01, subset='training', color_mode='rgb' # change this to the full dataset later
     )
     return data
 
