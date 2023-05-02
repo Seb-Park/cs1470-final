@@ -9,13 +9,13 @@ import matplotlib.pyplot as plt
 
 INPUTS_DIR = "../preprocess/inputs"
 IMAGE_DIM = (150, 100, 3) # 3 color channels
-LEARNING_RATE = 1e-3
-EPOCHS = 2
+LEARNING_RATE = 5e-3
+EPOCHS = 3
 
-def load_images(directory, batch_size=64):
+def load_images(directory, batch_size=32):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.01, subset='training', color_mode='rgb' # change this to the full dataset later
+        seed=42, validation_split=0.8, subset='training', color_mode='rgb' # change this to the full dataset later
     )
     return data
 
@@ -146,7 +146,7 @@ class VAE(tf.keras.Model):
         self.enc3 = Downsample(256, False)
 
         self.flatten = Flatten()
-        self.latent = Dense(latent_size, name='latent')
+        self.latent = Dense(latent_size, name='latent', activation='leaky_relu')
         self.encode_img = Dense(19*13) # from output shape of enc3
         self.shape_img = Reshape((19, 13, 1))
 
