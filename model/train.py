@@ -8,14 +8,15 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
 INPUTS_DIR = "../preprocess/inputs"
-IMAGE_DIM = (150, 100, 3) # 3 color channels
-LEARNING_RATE = 1e-3
-EPOCHS = 2
+OUTPUTS_DIR = "../preprocess/outputs"
+IMAGE_DIM = (192, 128, 3) # 3 color channels
+LEARNING_RATE = 5e-3
+EPOCHS = 5
 
-def load_images(directory, batch_size=64):
+def load_images(directory, batch_size=32):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.01, subset='training', color_mode='rgb' # change this to the full dataset later
+        seed=42, validation_split=0.9, subset='training', color_mode='rgb' # change this to the full dataset later
     )
     return data
 
@@ -117,16 +118,17 @@ def loss_function(x, x_hat):
     - loss: Tensor containing the scalar loss for the negative variational lowerbound
     """
     #loss = tf.math.reduce_mean(bce_function(x, x_hat) + dkl_function(mu, logvar))
-    loss = tf.math.reduce_mean(bce_function(x, x_hat))
+    loss = tf.math.reduce_mean(mse_function(x, x_hat) + bce_function(x, x_hat))
     #loss = tf.math.reduce_mean(tf.keras.losses.MeanSquaredError()(x, x_hat))
     #loss = tf.math.reduce_mean(tf.random.normal([2]))
     return loss
 
 class Downsample(tf.keras.models.Sequential):
-    def __init__(self, filters, batchnorm=True):
+    def __init__(self, filters, pool=True, batchnorm=True):
         super().__init__()
         self.add(Conv2D(filters, 3, activation='relu', padding='same'))
-        self.add(MaxPooling2D((2, 2), padding='same'))
+        if pool:
+            self.add(MaxPooling2D((2, 2), padding='same'))
         if batchnorm:
             self.add(BatchNormalization())
 class Upsample(tf.keras.models.Sequential):
@@ -143,19 +145,18 @@ class VAE(tf.keras.Model):
 
         self.enc1 = Downsample(64)
         self.enc2 = Downsample(128)
-        self.enc3 = Downsample(256, False)
+        self.enc3 = Downsample(256, True, False)
 
         self.flatten = Flatten()
-        self.latent = Dense(latent_size, name='latent')
-        self.encode_img = Dense(19*13) # from output shape of enc3
-        self.shape_img = Reshape((19, 13, 1))
+        self.latent = Dense(latent_size, activation='relu', name='latent')
+        self.encode_img = Dense(24*16) # from output shape of last downsample
+        self.shape_img = Reshape((24, 16, 1))
 
         self.dec1 = Upsample(256)
         self.dec2 = Upsample(128)
         self.dec3 = Upsample(64)
 
         self.gen_img = Conv2DTranspose(3, 3, activation='sigmoid', padding='same')
-        self.crop = tf.keras.layers.Cropping2D((1,2))
 
     def call(self, x):
         """
@@ -182,7 +183,6 @@ class VAE(tf.keras.Model):
         u1 = self.dec1(l)
         u2 = self.dec2(u1)
         u3 = self.dec3(u2)
-        u3 = self.crop(u3)
         u3 = tf.keras.layers.Concatenate()([u3, x]) # skip connection
         x_hat = self.gen_img(u3)
 

@@ -57,6 +57,8 @@ inputs = os.listdir(INPUTS)
 try:
   inputs.remove('.DS_Store')
 except: pass
+inputs.sort()
+
 styles = os.listdir(STYLES)
 try:
   styles.remove('.DS_Store')
@@ -67,9 +69,9 @@ PRINT_ON = int(len(inputs)*0.05) # print every 5%
 if PRINT_ON == 0: PRINT_ON = 1
 for i in range(len(inputs)):
   inpt = inputs[i]
-  for style in styles:
-    fname = 'outputs/'+inpt[:inpt.rfind('.')]+'__'+style[:style.rfind('.')]+'.jpg'
-    save_style_transfer(INPUTS+'/'+inpt, STYLES+'/'+style, fname)
+  style = np.random.choice(styles)
+  fname = 'outputs/'+inpt[:inpt.rfind('.')]+'__'+style[:style.rfind('.')]+'.jpg'
+  save_style_transfer(INPUTS+'/'+inpt, STYLES+'/'+style, fname)
   if i % PRINT_ON == 0:
     sys.stdout.write('\rStyling and saving images -- ')
     sys.stdout.write(str(int((i+1)/len(inputs)*100))+"%")
