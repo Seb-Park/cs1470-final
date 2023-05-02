@@ -8,14 +8,14 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
 INPUTS_DIR = "../preprocess/inputs"
-IMAGE_DIM = (150,100,3) # 3 color channels
+IMAGE_DIM = (150, 100, 3) # 3 color channels
 LEARNING_RATE = 1e-3
-EPOCHS = 5
+EPOCHS = 2
 
-def load_images(directory, batch_size=64):
+def load_images(directory, batch_size=16):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.7, subset='training' # change this to the full dataset later
+        seed=42, validation_split=0.5, subset='training', color_mode='rgb' # change this to the full dataset later
     )
     return data
 
@@ -36,9 +36,13 @@ def train_vae(model, x_data, y_data):
     for x, y in zip(x_data, y_data):
         x /= 255.0
         y /= 255.0
+        if total_loss == 0:
+            print(x.shape)
+            print(y.shape)
         with tf.GradientTape() as tape:
-            y_hat, mu, logvar = model(x)
-            loss = loss_function(y_hat, y, mu, logvar)
+            y_hat = model(x)
+            if total_loss == 0: print(y_hat.shape)
+            loss = loss_function(y, y_hat)
         gradients = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
         total_loss += loss
@@ -57,9 +61,11 @@ def show_vae_images(model, x_data, y_data):
     for xbatch,ybatch in zip(x_data,y_data):
         for x,y in zip(xbatch,ybatch):
             if np.random.random() < 0.1:
-                samples.append(x.numpy()/255.0)
-                samples.append(model(np.expand_dims(x, axis=0))[0][0].numpy())
-                samples.append(y.numpy()/255.0)
+                xnorm = x.numpy()/255.0
+                ynorm = y.numpy()/255.0
+                samples.append(xnorm)
+                samples.append(model(np.expand_dims(xnorm, axis=0))[0].numpy())
+                samples.append(ynorm)
             if len(samples) >= 9: break
         if len(samples) >= 9: break
 
@@ -73,6 +79,8 @@ def show_vae_images(model, x_data, y_data):
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_aspect("equal")
+        sample *= 255
+        sample = sample.astype('int32')
         plt.imshow(sample)
 
     # Save the generated images
@@ -91,26 +99,26 @@ def dkl_function(mu, logvar):
 
 def bce_function(x, x_hat):
     bce_fn = tf.keras.losses.BinaryCrossentropy(
-        from_logits=False, reduction=tf.keras.losses.Reduction.SUM
+        from_logits=False#, reduction=tf.keras.losses.Reduction.SUM
     )
     reconstruction_loss = bce_fn(x, x_hat)
     return reconstruction_loss
 
-def loss_function(x_hat, x, mu, logvar):
+def loss_function(x, x_hat):
     """
     Computes the negative variational lower bound loss term of the VAE (refer to formulation in notebook).
     Returned loss is the average loss per sample in the current batch.
 
     Inputs:
-    - x_hat: Reconstructed input data of shape (N, H, W, C)
     - x: Input data for this timestep of shape (N, H, W, C)
+    - x_hat: Reconstructed input data of shape (N, H, W, C)
     
     Returns:
     - loss: Tensor containing the scalar loss for the negative variational lowerbound
     """
     #loss = tf.math.reduce_mean(bce_function(x, x_hat) + dkl_function(mu, logvar))
     loss = tf.math.reduce_mean(bce_function(x, x_hat))
-    #loss = tf.keras.losses.MeanSquaredError()(x, x_hat)
+    #loss = tf.math.reduce_mean(tf.keras.losses.MeanSquaredError()(x, x_hat))
     return loss
 
 class Downsample(tf.keras.models.Sequential):
@@ -132,17 +140,14 @@ class VAE(tf.keras.Model):
         self.input_size = image_shape[0]*image_shape[1]*image_shape[2]  # H*W*C
         self.latent_size = latent_size  # Z
         self.hidden_dim = hidden_dim  # H_d
-        self.mu_layer = Dense(latent_size) # not used right now
-        self.logvar_layer = Dense(latent_size) # not used right now
-        self.latent_layer = Dense(latent_size) # not used right now
 
-        self.enc1 = Downsample(64)
-        self.enc2 = Downsample(32)
-        self.enc3 = Downsample(16, False)
+        self.enc1 = Downsample(8)
+        self.enc2 = Downsample(16)
+        self.enc3 = Downsample(32, False)
 
-        self.dec1 = Upsample(64)
-        self.dec2 = Upsample(32)
-        self.dec3 = Upsample(16)
+        self.dec1 = Upsample(32)
+        self.dec2 = Upsample(16)
+        self.dec3 = Upsample(8)
 
 
     def call(self, x):
@@ -150,25 +155,28 @@ class VAE(tf.keras.Model):
         Performs forward pass through autoencoder model
     
         Inputs:
-        - x: Batch of input images of shape (N, C, H, W)
+        - x: Batch of input images of shape (N, H, W, C)
         
         Returns:
-        - x_hat: Reconstruced input data of shape (N,C,H,W)
-        - mu: Matrix representing estimated posterior mu (N, Z), with Z latent space dimension
-        - logvar: Matrix representing estimataed variance in log-space (N, Z), with Z latent space dimension
+        - x_hat: Reconstructed input data of shape (N, H, W, C)
         """
-        
-        d1 = self.enc1(x)
-        d2 = self.enc2(d1)
-        d3 = self.enc3(d2)
+        #return x
+        #x_hat = Conv2D(64, 3, activation='sigmoid', padding='same')(x)
+        #x_hat = BatchNormalization()(x)
+        x_hat = Conv2D(3, 1, activation='sigmoid', padding='same', input_shape=IMAGE_DIM)(x)
+        return x_hat
+    
+        # d1 = self.enc1(x)
+        # d2 = self.enc2(d1)
+        # d3 = self.enc3(d2)
 
-        u1 = self.dec1(d3)
-        u2 = self.dec2(u1)
-        u3 = self.dec3(u2)
-        x_hat = Conv2D(3, 3, activation='sigmoid', padding='valid')(u3)
-        x_hat = tf.keras.layers.Cropping2D((0, 1))(x_hat)
+        # u1 = self.dec1(d3)
+        # u2 = self.dec2(u1)
+        # u3 = self.dec3(u2)
+        # x_hat = Conv2D(3, 3, activation='sigmoid', padding='valid')(u3)
+        # x_hat = tf.keras.layers.Cropping2D((0, 1))(x_hat)
 
-        return x_hat, 0, 0
+        # return x_hat
 
 def reparametrize(mu, logvar):
     """
@@ -196,7 +204,7 @@ if __name__ == "__main__":
     print("Training model...")
     for e in range(EPOCHS):
         loss = train_vae(model, x_data, y_data)
-        print("epoch loss:",loss)
+        print("epoch %d/%d loss:" % (e+1, EPOCHS), loss)
     print("Saving sample outputs")
     show_vae_images(model, x_data, y_data)
     print("Saving model")
