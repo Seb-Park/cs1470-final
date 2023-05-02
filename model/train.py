@@ -10,12 +10,12 @@ import matplotlib.pyplot as plt
 INPUTS_DIR = "../preprocess/inputs"
 IMAGE_DIM = (150, 100, 3) # 3 color channels
 LEARNING_RATE = 1e-3
-EPOCHS = 2
+EPOCHS = 5
 
 def load_images(directory, batch_size=16):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.5, subset='training', color_mode='rgb' # change this to the full dataset later
+        seed=42, validation_split=0.99, subset='training', color_mode='rgb' # change this to the full dataset later
     )
     return data
 
@@ -36,12 +36,8 @@ def train_vae(model, x_data, y_data):
     for x, y in zip(x_data, y_data):
         x /= 255.0
         y /= 255.0
-        if total_loss == 0:
-            print(x.shape)
-            print(y.shape)
         with tf.GradientTape() as tape:
             y_hat = model(x)
-            if total_loss == 0: print(y_hat.shape)
             loss = loss_function(y, y_hat)
         gradients = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
@@ -101,8 +97,12 @@ def bce_function(x, x_hat):
     bce_fn = tf.keras.losses.BinaryCrossentropy(
         from_logits=False#, reduction=tf.keras.losses.Reduction.SUM
     )
-    reconstruction_loss = bce_fn(x, x_hat)
-    return reconstruction_loss
+    # red_loss = bce_fn(x[:,:,0], x_hat[:,:,0])
+    # green_loss = bce_fn(x[:,:,1], x_hat[:,:,1])
+    # blue_loss = bce_fn(x[:,:,2], x_hat[:,:,2])
+    # bright_loss = tf.math.reduce_mean(bce_fn(tf.math.reduce_mean(x, axis=3), tf.math.reduce_mean(x_hat, axis=3)))
+    # return (red_loss + green_loss + blue_loss + bright_loss) / 4.0
+    return bce_fn(x, x_hat)
 
 def loss_function(x, x_hat):
     """
@@ -119,6 +119,7 @@ def loss_function(x, x_hat):
     #loss = tf.math.reduce_mean(bce_function(x, x_hat) + dkl_function(mu, logvar))
     loss = tf.math.reduce_mean(bce_function(x, x_hat))
     #loss = tf.math.reduce_mean(tf.keras.losses.MeanSquaredError()(x, x_hat))
+    #loss = tf.math.reduce_mean(tf.random.normal([2]))
     return loss
 
 class Downsample(tf.keras.models.Sequential):
@@ -131,7 +132,7 @@ class Downsample(tf.keras.models.Sequential):
 class Upsample(tf.keras.models.Sequential):
     def __init__(self, filters):
         super().__init__()
-        self.add(Conv2DTranspose(filters, 3, activation='tanh', padding='same'))
+        self.add(Conv2DTranspose(filters, 3, activation='relu', padding='same'))
         self.add(UpSampling2D((2, 2)))
 class VAE(tf.keras.Model):
     def __init__(self, image_shape, latent_size=64, hidden_dim=512):
@@ -141,13 +142,13 @@ class VAE(tf.keras.Model):
         self.latent_size = latent_size  # Z
         self.hidden_dim = hidden_dim  # H_d
 
-        self.enc1 = Downsample(8)
-        self.enc2 = Downsample(16)
-        self.enc3 = Downsample(32, False)
+        self.enc1 = Downsample(32)
+        self.enc2 = Downsample(64)
+        self.enc3 = Downsample(128, False)
 
-        self.dec1 = Upsample(32)
-        self.dec2 = Upsample(16)
-        self.dec3 = Upsample(8)
+        self.dec1 = Upsample(128)
+        self.dec2 = Upsample(64)
+        self.dec3 = Upsample(32)
 
 
     def call(self, x):
@@ -160,23 +161,19 @@ class VAE(tf.keras.Model):
         Returns:
         - x_hat: Reconstructed input data of shape (N, H, W, C)
         """
-        #return x
-        #x_hat = Conv2D(64, 3, activation='sigmoid', padding='same')(x)
-        #x_hat = BatchNormalization()(x)
-        x_hat = Conv2D(3, 1, activation='sigmoid', padding='same', input_shape=IMAGE_DIM)(x)
-        return x_hat
+        # return x
     
-        # d1 = self.enc1(x)
-        # d2 = self.enc2(d1)
-        # d3 = self.enc3(d2)
+        d1 = self.enc1(x)
+        d2 = self.enc2(d1)
+        d3 = self.enc3(d2)
 
-        # u1 = self.dec1(d3)
-        # u2 = self.dec2(u1)
-        # u3 = self.dec3(u2)
-        # x_hat = Conv2D(3, 3, activation='sigmoid', padding='valid')(u3)
-        # x_hat = tf.keras.layers.Cropping2D((0, 1))(x_hat)
+        u1 = self.dec1(d3)
+        u2 = self.dec2(u1)
+        u3 = self.dec3(u2)
+        x_hat = Conv2D(3, 3, activation='sigmoid', padding='valid')(u3)
+        x_hat = tf.keras.layers.Cropping2D((0, 1))(x_hat)
 
-        # return x_hat
+        return x_hat
 
 def reparametrize(mu, logvar):
     """
