@@ -14,7 +14,7 @@ IMAGE_DIM = (192, 128, 3) # 3 color channels
 LEARNING_RATE = 5e-3
 EPOCHS = 5
 
-def load_images(directory, batch_size=64):
+def load_images(directory, batch_size=32):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
         seed=42, validation_split=0.9, subset='training', color_mode='rgb' # change this to the full dataset later
@@ -147,15 +147,9 @@ class Autoencoder(tf.keras.Model):
         self.input_size = image_shape[0]*image_shape[1]*image_shape[2]  # H*W*C
         self.latent_size = latent_size  # Z
 
-        self.encoder = Sequential([
-            Input(image_shape),
-            Downsample(128),
-            #Downsample(64),
-            #Downsample(128),
-            #Downsample(256)
-            #Downsample(512),
-            #Downsample(256, False),
-        ], name='encoder')
+        self.enc1 = Downsample(32)
+        self.enc2 = Downsample(64)
+        self.enc3 = Downsample(128)
 
         # self.latent = Sequential([
         #     Input(self.encoder.output_shape[1:]),
@@ -165,18 +159,13 @@ class Autoencoder(tf.keras.Model):
         #     Reshape((24, 16, 3)), # after three upsamples will be 192x128
         # ], name='latent')
 
-        self.decoder = Sequential([
-            Input(self.encoder.output_shape[1:]),
-            #Input((24, 16, 3)),
-            #Upsample(256, dropout=True),
-            #Upsample(128, dropout=True),
-            #Upsample(64, dropout=True),
-            Upsample(128, dropout=True)
-        ], name='decoder')
+        self.dec1 = Upsample(128, dropout=True)
+        self.dec2 = Upsample(64)
+        self.dec3 = Upsample(32)
 
         self.skip = Concatenate()
 
-        self.gen_img = Conv2DTranspose(3, 3, activation='sigmoid', padding='same')
+        self.gen_img = Conv2DTranspose(3, 3, activation='sigmoid', padding='same', use_bias=False)
 
     def call(self, x):
         """
@@ -189,12 +178,18 @@ class Autoencoder(tf.keras.Model):
         - x_hat: Reconstructed input data of shape (N, H, W, C)
         """
     
-        enc = self.encoder(x)
-        # l = self.latent(enc)
-        dec = self.decoder(enc)
-        skip = dec
-        # skip = self.skip([dec, x])
-        x_hat = self.gen_img(skip)
+        e1 = self.enc1(x)
+        e2 = self.enc2(e1)
+        e3 = self.enc3(e2)
+
+        d1 = self.dec1(e3)
+        skip1 = self.skip([d1, e2])
+        d2 = self.dec2(skip1)
+        skip2 = self.skip([d2, e1])
+        d3 = self.dec3(skip2)
+        skip3 = self.skip([d3, x])
+
+        x_hat = self.gen_img(skip3)
 
         return x_hat
 
