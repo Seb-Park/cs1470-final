@@ -4,13 +4,13 @@ import tensorflow as tf
 os.environ['TFHUB_MODEL_LOAD_FORMAT'] = 'COMPRESSED'
 import tensorflow_hub as hub
 #import matplotlib.pyplot as plt
-import matplotlib as mpl
-mpl.rcParams['figure.figsize'] = (12, 12)
-mpl.rcParams['axes.grid'] = False
+#import matplotlib as mpl
+#mpl.rcParams['figure.figsize'] = (12, 12)
+#mpl.rcParams['axes.grid'] = False
 import numpy as np
 import PIL.Image
 
-INPUTS = 'inputs'
+INPUTS = 'photos'
 STYLES = 'styles'
 ONLY_CHALK = True
 
@@ -73,7 +73,7 @@ if PRINT_ON == 0: PRINT_ON = 1
 for i in range(len(inputs)):
   inpt = inputs[i]
   style = np.random.choice(styles)
-  fname = 'outputs/'+inpt[:inpt.rfind('.')]+'__'+style[:style.rfind('.')]+'.jpg'
+  fname = 'paintings/'+inpt[:inpt.rfind('.')]+'__'+style[:style.rfind('.')]+'.jpg'
   save_style_transfer(INPUTS+'/'+inpt, STYLES+'/'+style, fname)
   if i % PRINT_ON == 0:
     sys.stdout.write('\rStyling and saving images -- ')
