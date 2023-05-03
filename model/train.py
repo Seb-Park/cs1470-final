@@ -14,19 +14,19 @@ IMAGE_DIM = (192, 128, 3) # 3 color channels
 LEARNING_RATE = 5e-3
 EPOCHS = 5
 
-def load_images(directory, batch_size=128):
+def load_images(directory, batch_size=64):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.90, subset='training', color_mode='rgb' # change this to the full dataset later
+        seed=42, validation_split=0.9, subset='training', color_mode='rgb' # change this to the full dataset later
     )
     return data
 
-def train_vae(model, x_data, y_data):
+def train_epoch(model, x_data, y_data):
     """
     Train your autoencoder with one epoch.
 
     Inputs:
-    - model: Your VAE instance.
+    - model: Your autoencoder instance.
     - x_data: A tf.data.Dataset of noisy input images (stylized images).
     - y_data: A tf.data.Dataset of reconstructed images (photographs).
 
@@ -46,11 +46,11 @@ def train_vae(model, x_data, y_data):
         total_loss += loss
     return total_loss / len(x_data)
 
-def show_vae_images(model, x_data, y_data):
+def show_images(model, x_data, y_data):
     """
-    Generate 10 images from random vectors.
-    Show the generated images from your trained VAE.
-    Image will be saved to show_vae_images.pdf
+    Generate 9 images from random samples.
+    Show the generated images from your trained model.
+    Image will be saved to show_images.pdf
 
     Inputs:
     - model: Your trained model.
@@ -82,7 +82,7 @@ def show_vae_images(model, x_data, y_data):
         plt.imshow(sample)
 
     # Save the generated images
-    plt.savefig("show_vae_images.pdf", bbox_inches="tight")
+    plt.savefig("show_images.pdf", bbox_inches="tight")
     plt.close(fig)
 
 def mse_function(x, x_hat):
@@ -108,7 +108,7 @@ def bce_function(x, x_hat):
 
 def loss_function(x, x_hat):
     """
-    Computes the negative variational lower bound loss term of the VAE (refer to formulation in notebook).
+    Computes the loss of the autoencoder.
     Returned loss is the average loss per sample in the current batch.
 
     Inputs:
@@ -137,9 +137,9 @@ class Upsample(tf.keras.Sequential):
         self.add(UpSampling2D((2, 2)))
         if dropout:
             self.add(Dropout(0.2))
-class VAE(tf.keras.Model):
-    def __init__(self, image_shape, latent_size=512):
-        super(VAE, self).__init__()
+class Autoencoder(tf.keras.Model):
+    def __init__(self, image_shape, latent_size=256):
+        super(Autoencoder, self).__init__()
         self.input_size = image_shape[0]*image_shape[1]*image_shape[2]  # H*W*C
         self.latent_size = latent_size  # Z
 
@@ -150,18 +150,21 @@ class VAE(tf.keras.Model):
             Downsample(256),
             #Downsample(512),
             #Downsample(256, False),
+            # maybe try to condense the image even more?
+            # avoid the bottleneck where the decoder input has only three channels
         ], name='encoder')
 
         self.latent = Sequential([
             Input(self.encoder.output_shape[1:]),
             Flatten(),
             Dense(latent_size, activation='relu'),
-            Dense(24*16*1),
-            Reshape((24, 16, 1)), # after three upsamples will be 192x128
+            Dense(24*16*3),
+            Reshape((24, 16, 3)), # after three upsamples will be 192x128
         ], name='latent')
 
         self.decoder = Sequential([
-            Input(self.encoder.output_shape[1:]),
+            #Input(self.encoder.output_shape[1:]),
+            Input((24, 16, 3)),
             Upsample(256, True),
             Upsample(128),
             Upsample(64)
@@ -183,10 +186,11 @@ class VAE(tf.keras.Model):
         """
     
         enc = self.encoder(x)
-        #l = self.latent(enc)
-        dec = self.decoder(enc)
-        # skip = self.skip([dec, x])
+        # l = enc
+        l = self.latent(enc)
+        dec = self.decoder(l)
         skip = dec
+        # skip = self.skip([dec, x])
         x_hat = self.gen_img(skip)
 
         return x_hat
@@ -210,15 +214,15 @@ def reparametrize(mu, logvar):
 
 if __name__ == "__main__":
     print("Loading model")
-    model = VAE(IMAGE_DIM)
+    model = Autoencoder(IMAGE_DIM)
     print("Loading data")
     x_data = load_images(INPUTS_DIR)
     y_data = load_images(INPUTS_DIR) # later change to be different directory
     print("Training model...")
     for e in range(EPOCHS):
-        loss = train_vae(model, x_data, y_data)
+        loss = train_epoch(model, x_data, y_data)
         print("epoch %d/%d loss:" % (e+1, EPOCHS), loss)
-        print("Saving sample outputs")
-        show_vae_images(model, x_data, y_data)
+        show_images(model, x_data, y_data)
+        print("Saved sample outputs")
     print("Saving model")
     model.save_weights("./ckpts/model_ckpts")
