@@ -16,7 +16,7 @@ EPOCHS = 5
 def load_images(directory, batch_size=32):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.9, subset='training', color_mode='rgb' # change this to the full dataset later
+        seed=42, validation_split=0.99, subset='training', color_mode='rgb' # change this to the full dataset later
     )
     return data
 
@@ -137,26 +137,21 @@ class Upsample(tf.keras.models.Sequential):
         self.add(Conv2DTranspose(filters, 3, activation='relu', padding='same'))
         self.add(UpSampling2D((2, 2)))
 class VAE(tf.keras.Model):
-    def __init__(self, image_shape, latent_size=512):
+    def __init__(self, image_shape, latent_size=64, hidden_dim=512):
         super(VAE, self).__init__()
         self.image_shape = image_shape
         self.input_size = image_shape[0]*image_shape[1]*image_shape[2]  # H*W*C
         self.latent_size = latent_size  # Z
+        self.hidden_dim = hidden_dim  # H_d
 
-        self.enc1 = Downsample(64)
-        self.enc2 = Downsample(128)
-        self.enc3 = Downsample(256, True, False)
+        self.enc1 = Downsample(32)
+        self.enc2 = Downsample(64)
+        self.enc3 = Downsample(128, False)
 
-        self.flatten = Flatten()
-        self.latent = Dense(latent_size, name='latent', activation='leaky_relu')
-        self.encode_img = Dense(24*16) # from output shape of enc3
-        self.shape_img = Reshape((24, 16, 1))
+        self.dec1 = Upsample(128)
+        self.dec2 = Upsample(64)
+        self.dec3 = Upsample(32)
 
-        self.dec1 = Upsample(256)
-        self.dec2 = Upsample(128)
-        self.dec3 = Upsample(64)
-
-        self.gen_img = Conv2DTranspose(3, 3, activation='sigmoid', padding='same')
 
     def call(self, x):
         """
@@ -169,22 +164,16 @@ class VAE(tf.keras.Model):
         - x_hat: Reconstructed input data of shape (N, H, W, C)
         """
         # return x
-        # return tf.clip_by_value(Conv2D(3, 1, padding='same')(x), 0, 1)
     
         d1 = self.enc1(x)
         d2 = self.enc2(d1)
         d3 = self.enc3(d2)
 
-        l = self.flatten(d3)
-        l = self.latent(l)
-        l = self.encode_img(l)
-        l = self.shape_img(l)
-
-        u1 = self.dec1(l)
+        u1 = self.dec1(d3)
         u2 = self.dec2(u1)
         u3 = self.dec3(u2)
-        u3 = tf.keras.layers.Concatenate()([u3, x]) # skip connection
-        x_hat = self.gen_img(u3)
+        x_hat = Conv2D(3, 3, activation='sigmoid', padding='valid')(u3)
+        x_hat = tf.keras.layers.Cropping2D((0, 1))(x_hat)
 
         return x_hat
 
@@ -207,7 +196,7 @@ def reparametrize(mu, logvar):
 
 if __name__ == "__main__":
     print("Loading model")
-    model = VAE(IMAGE_DIM)
+    model = VAE(IMAGE_DIM, 15)
     print("Loading data")
     x_data = load_images(INPUTS_DIR)
     y_data = load_images(INPUTS_DIR) # later change to be different directory
