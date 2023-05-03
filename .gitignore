@@ -6,6 +6,8 @@ preprocess/styles/*
 preprocess/dataset/*
 preprocess/test-outputs/*
 preprocess/test-inputs/*
+preprocess/paintings/*
+preprocess/photos/*
 model/ckpts/*
 
 ### macOS ###
