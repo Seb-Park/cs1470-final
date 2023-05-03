@@ -7,8 +7,8 @@ from tensorflow.keras.layers import Flatten, Dense, Reshape,\
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
-INPUTS_DIR = "../preprocess/inputs"
-OUTPUTS_DIR = "../preprocess/outputs"
+INPUTS_DIR = "../preprocess/photos"
+OUTPUTS_DIR = "../preprocess/photos"
 IMAGE_DIM = (192, 128, 3) # 3 color channels
 LEARNING_RATE = 5e-3
 EPOCHS = 5
@@ -16,7 +16,7 @@ EPOCHS = 5
 def load_images(directory, batch_size=32):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.99, subset='training', color_mode='rgb' # change this to the full dataset later
+        seed=42, validation_split=0.98, subset='training', color_mode='rgb' # change this to the full dataset later
     )
     return data
 
@@ -144,9 +144,9 @@ class VAE(tf.keras.Model):
         self.latent_size = latent_size  # Z
         self.hidden_dim = hidden_dim  # H_d
 
-        self.enc1 = Downsample(32)
-        self.enc2 = Downsample(64)
-        self.enc3 = Downsample(128, False)
+        self.enc1 = Downsample(32, True, False)
+        self.enc2 = Downsample(64, True, False)
+        self.enc3 = Downsample(128, True, False)
 
         self.dec1 = Upsample(128)
         self.dec2 = Upsample(64)
@@ -172,8 +172,8 @@ class VAE(tf.keras.Model):
         u1 = self.dec1(d3)
         u2 = self.dec2(u1)
         u3 = self.dec3(u2)
-        x_hat = Conv2D(3, 3, activation='sigmoid', padding='valid')(u3)
-        x_hat = tf.keras.layers.Cropping2D((0, 1))(x_hat)
+        x_hat = Conv2D(3, 3, activation='sigmoid', padding='same')(u3)
+        #x_hat = tf.keras.layers.Cropping2D((0, 1))(x_hat)
 
         return x_hat
 
