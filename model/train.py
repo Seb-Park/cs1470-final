@@ -3,20 +3,21 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Flatten, Dense, Reshape,\
-    Conv2D, Conv2DTranspose, BatchNormalization, LeakyReLU, UpSampling2D, MaxPooling2D
+    Conv2D, Conv2DTranspose, BatchNormalization, LeakyReLU,\
+    UpSampling2D, MaxPooling2D, Dropout, Concatenate, Input
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
-INPUTS_DIR = "../preprocess/inputs"
-OUTPUTS_DIR = "../preprocess/outputs"
+INPUTS_DIR = "../preprocess/photos"
+OUTPUTS_DIR = "../preprocess/photos"
 IMAGE_DIM = (192, 128, 3) # 3 color channels
 LEARNING_RATE = 5e-3
 EPOCHS = 5
 
-def load_images(directory, batch_size=32):
+def load_images(directory, batch_size=128):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.9, subset='training', color_mode='rgb' # change this to the full dataset later
+        seed=42, validation_split=0.90, subset='training', color_mode='rgb' # change this to the full dataset later
     )
     return data
 
@@ -118,43 +119,55 @@ def loss_function(x, x_hat):
     - loss: Tensor containing the scalar loss for the negative variational lowerbound
     """
     #loss = tf.math.reduce_mean(bce_function(x, x_hat) + dkl_function(mu, logvar))
-    loss = tf.math.reduce_mean(mse_function(x, x_hat) + bce_function(x, x_hat))
+    loss = tf.math.reduce_mean(bce_function(x, x_hat))
     #loss = tf.math.reduce_mean(tf.keras.losses.MeanSquaredError()(x, x_hat))
     #loss = tf.math.reduce_mean(tf.random.normal([2]))
     return loss
 
-class Downsample(tf.keras.models.Sequential):
-    def __init__(self, filters, pool=True, batchnorm=True):
+class Downsample(tf.keras.Sequential):
+    def __init__(self, filters, pool=True):
         super().__init__()
         self.add(Conv2D(filters, 3, activation='relu', padding='same'))
         if pool:
             self.add(MaxPooling2D((2, 2), padding='same'))
-        if batchnorm:
-            self.add(BatchNormalization())
-class Upsample(tf.keras.models.Sequential):
-    def __init__(self, filters):
+class Upsample(tf.keras.Sequential):
+    def __init__(self, filters, dropout=False):
         super().__init__()
         self.add(Conv2DTranspose(filters, 3, activation='relu', padding='same'))
         self.add(UpSampling2D((2, 2)))
+        if dropout:
+            self.add(Dropout(0.2))
 class VAE(tf.keras.Model):
     def __init__(self, image_shape, latent_size=512):
         super(VAE, self).__init__()
-        self.image_shape = image_shape
         self.input_size = image_shape[0]*image_shape[1]*image_shape[2]  # H*W*C
         self.latent_size = latent_size  # Z
 
-        self.enc1 = Downsample(64)
-        self.enc2 = Downsample(128)
-        self.enc3 = Downsample(256, True, False)
+        self.encoder = Sequential([
+            Input(image_shape),
+            Downsample(64),
+            Downsample(128),
+            Downsample(256),
+            #Downsample(512),
+            #Downsample(256, False),
+        ], name='encoder')
 
-        self.flatten = Flatten()
-        self.latent = Dense(latent_size, name='latent', activation='leaky_relu')
-        self.encode_img = Dense(24*16) # from output shape of enc3
-        self.shape_img = Reshape((24, 16, 1))
+        self.latent = Sequential([
+            Input(self.encoder.output_shape[1:]),
+            Flatten(),
+            Dense(latent_size, activation='relu'),
+            Dense(24*16*1),
+            Reshape((24, 16, 1)), # after three upsamples will be 192x128
+        ], name='latent')
 
-        self.dec1 = Upsample(256)
-        self.dec2 = Upsample(128)
-        self.dec3 = Upsample(64)
+        self.decoder = Sequential([
+            Input(self.encoder.output_shape[1:]),
+            Upsample(256, True),
+            Upsample(128),
+            Upsample(64)
+        ], name='decoder')
+
+        self.skip = Concatenate()
 
         self.gen_img = Conv2DTranspose(3, 3, activation='sigmoid', padding='same')
 
@@ -168,23 +181,13 @@ class VAE(tf.keras.Model):
         Returns:
         - x_hat: Reconstructed input data of shape (N, H, W, C)
         """
-        # return x
-        # return tf.clip_by_value(Conv2D(3, 1, padding='same')(x), 0, 1)
     
-        d1 = self.enc1(x)
-        d2 = self.enc2(d1)
-        d3 = self.enc3(d2)
-
-        l = self.flatten(d3)
-        l = self.latent(l)
-        l = self.encode_img(l)
-        l = self.shape_img(l)
-
-        u1 = self.dec1(l)
-        u2 = self.dec2(u1)
-        u3 = self.dec3(u2)
-        u3 = tf.keras.layers.Concatenate()([u3, x]) # skip connection
-        x_hat = self.gen_img(u3)
+        enc = self.encoder(x)
+        #l = self.latent(enc)
+        dec = self.decoder(enc)
+        # skip = self.skip([dec, x])
+        skip = dec
+        x_hat = self.gen_img(skip)
 
         return x_hat
 
@@ -215,7 +218,7 @@ if __name__ == "__main__":
     for e in range(EPOCHS):
         loss = train_vae(model, x_data, y_data)
         print("epoch %d/%d loss:" % (e+1, EPOCHS), loss)
-    print("Saving sample outputs")
-    show_vae_images(model, x_data, y_data)
+        print("Saving sample outputs")
+        show_vae_images(model, x_data, y_data)
     print("Saving model")
     model.save_weights("./ckpts/model_ckpts")

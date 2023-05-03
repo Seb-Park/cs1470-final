@@ -5,7 +5,7 @@ import os
 HEIGHT = 192
 WIDTH  = 128
 INPUTS = 'dataset'
-SAVETO = 'inputs'
+SAVETO = 'photos'
 inputs = os.listdir(INPUTS)
 try:
   inputs.remove('.DS_Store')
