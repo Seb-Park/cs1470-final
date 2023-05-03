@@ -148,9 +148,9 @@ class VAE(tf.keras.Model):
         self.enc3 = Downsample(256, True, False)
 
         self.flatten = Flatten()
-        self.latent = Dense(latent_size, activation='relu', name='latent')
-        self.encode_img = Dense(24*16) # from output shape of last downsample
-        self.shape_img = Reshape((24, 16, 1))
+        self.latent = Dense(latent_size, name='latent', activation='leaky_relu')
+        self.encode_img = Dense(19*13) # from output shape of enc3
+        self.shape_img = Reshape((19, 13, 1))
 
         self.dec1 = Upsample(256)
         self.dec2 = Upsample(128)
