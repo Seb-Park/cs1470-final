@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Flatten, Dense, Reshape,\
-    Conv2D, Conv2DTranspose, BatchNormalization, LeakyReLU,\
+    Conv2D, Conv2DTranspose, BatchNormalization, LeakyReLU, ReLU,\
     UpSampling2D, MaxPooling2D, Dropout, Concatenate, Input
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -127,14 +127,18 @@ def loss_function(x, x_hat):
 class Downsample(tf.keras.Sequential):
     def __init__(self, filters, pool=True):
         super().__init__()
-        self.add(Conv2D(filters, 3, activation='relu', padding='same'))
+        self.add(Conv2D(filters, 3, padding='same'))
+        self.add(ReLU())
         if pool:
             self.add(MaxPooling2D((2, 2), padding='same'))
 class Upsample(tf.keras.Sequential):
-    def __init__(self, filters, dropout=False):
+    def __init__(self, filters, unpool=True, dropout=False):
         super().__init__()
-        self.add(Conv2DTranspose(filters, 3, activation='relu', padding='same'))
-        self.add(UpSampling2D((2, 2)))
+        self.add(Conv2DTranspose(filters, 3, padding='same'))
+        self.add(BatchNormalization())
+        self.add(ReLU())
+        if unpool:
+            self.add(UpSampling2D((2, 2)))
         if dropout:
             self.add(Dropout(0.2))
 class Autoencoder(tf.keras.Model):
@@ -145,29 +149,29 @@ class Autoencoder(tf.keras.Model):
 
         self.encoder = Sequential([
             Input(image_shape),
-            Downsample(64),
             Downsample(128),
-            Downsample(256),
+            #Downsample(64),
+            #Downsample(128),
+            #Downsample(256)
             #Downsample(512),
             #Downsample(256, False),
-            # maybe try to condense the image even more?
-            # avoid the bottleneck where the decoder input has only three channels
         ], name='encoder')
 
-        self.latent = Sequential([
-            Input(self.encoder.output_shape[1:]),
-            Flatten(),
-            Dense(latent_size, activation='relu'),
-            Dense(24*16*3),
-            Reshape((24, 16, 3)), # after three upsamples will be 192x128
-        ], name='latent')
+        # self.latent = Sequential([
+        #     Input(self.encoder.output_shape[1:]),
+        #     Flatten(),
+        #     Dense(latent_size, activation='relu'),
+        #     Dense(24*16*3),
+        #     Reshape((24, 16, 3)), # after three upsamples will be 192x128
+        # ], name='latent')
 
         self.decoder = Sequential([
-            #Input(self.encoder.output_shape[1:]),
-            Input((24, 16, 3)),
-            Upsample(256, True),
-            Upsample(128),
-            Upsample(64)
+            Input(self.encoder.output_shape[1:]),
+            #Input((24, 16, 3)),
+            #Upsample(256, dropout=True),
+            #Upsample(128, dropout=True),
+            #Upsample(64, dropout=True),
+            Upsample(128, dropout=True)
         ], name='decoder')
 
         self.skip = Concatenate()
@@ -186,9 +190,8 @@ class Autoencoder(tf.keras.Model):
         """
     
         enc = self.encoder(x)
-        # l = enc
-        l = self.latent(enc)
-        dec = self.decoder(l)
+        # l = self.latent(enc)
+        dec = self.decoder(enc)
         skip = dec
         # skip = self.skip([dec, x])
         x_hat = self.gen_img(skip)
