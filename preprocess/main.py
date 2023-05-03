@@ -12,6 +12,7 @@ import PIL.Image
 
 INPUTS = 'inputs'
 STYLES = 'styles'
+ONLY_CHALK = True
 
 # load the model
 print("Loading model")
@@ -63,6 +64,8 @@ styles = os.listdir(STYLES)
 try:
   styles.remove('.DS_Store')
 except: pass
+if ONLY_CHALK:
+  styles = ['chalk.jpg']
 
 
 PRINT_ON = int(len(inputs)*0.05) # print every 5%

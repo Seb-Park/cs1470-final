@@ -2,7 +2,6 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,macos
 preprocess/inputs/*
 preprocess/outputs/*
-preprocess/styles/*
 preprocess/dataset/*
 preprocess/test-outputs/*
 preprocess/test-inputs/*
