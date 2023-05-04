@@ -8,16 +8,17 @@ from tensorflow.keras.layers import Flatten, Dense, Reshape,\
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
-INPUTS_DIR = "../preprocess/paintings"
-OUTPUTS_DIR = "../preprocess/photos_bw"
+INPUTS_DIR = "../preprocess/photos_bw"
+INPUT_IS_BW = True
+OUTPUTS_DIR = "../preprocess/photos"
 IMAGE_DIM = (192, 128, 3) # 3 color channels
 LEARNING_RATE = 5e-3
 EPOCHS = 5
 
-def load_images(directory, batch_size=32):
+def load_images(directory, batch_size=32, color_mode='rgb'):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.3, subset='training', color_mode='rgb' # change this to the full dataset later
+        seed=42, validation_split=0.3, subset='training', color_mode=color_mode
     )
     return data
 
@@ -61,7 +62,10 @@ def show_images(model, x_data, y_data):
             if np.random.random() < 0.1:
                 xnorm = x.numpy()/255.0
                 ynorm = y.numpy()/255.0
-                samples.append(xnorm)
+                if INPUT_IS_BW:
+                    samples.append(np.tile(xnorm, (1,1,3)))
+                else:
+                    samples.append(xnorm)
                 samples.append(model(np.expand_dims(xnorm, axis=0))[0].numpy())
                 samples.append(ynorm)
             if len(samples) >= 9: break
@@ -214,8 +218,8 @@ if __name__ == "__main__":
     print("Loading model")
     model = Autoencoder(IMAGE_DIM)
     print("Loading data")
-    x_data = load_images(INPUTS_DIR)
-    y_data = load_images(OUTPUTS_DIR) # later change to be different directory
+    x_data = load_images(INPUTS_DIR, color_mode = 'grayscale' if INPUT_IS_BW else 'rgb')
+    y_data = load_images(OUTPUTS_DIR)
     print("Training model...")
     for e in range(EPOCHS):
         loss = train_epoch(model, x_data, y_data)

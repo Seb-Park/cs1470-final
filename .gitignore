@@ -8,6 +8,7 @@ preprocess/test-inputs/*
 preprocess/paintings/*
 preprocess/photos/*
 preprocess/photos_bw/*
+preprocess/ckpts/*
 model/ckpts/*
 
 ### macOS ###
