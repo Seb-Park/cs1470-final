@@ -13,8 +13,8 @@ INPUT_IS_BW = False
 OUTPUTS_DIR = "../preprocess/photos_bw"
 OUTPUT_IS_BW = True
 IMAGE_DIM = (192, 128, 3) # 3 color channels
-LEARNING_RATE = 2e-3
-EPOCHS = 10
+LEARNING_RATE = 4e-3
+EPOCHS = 15
 
 def load_images(directory, batch_size=64, color_mode='rgb'):
     data = tf.keras.utils.image_dataset_from_directory(
@@ -133,7 +133,7 @@ def loss_function(x, x_hat):
     """
     #loss = tf.math.reduce_mean(bce_function(x, x_hat) + dkl_function(mu, logvar))
     #loss = tf.math.reduce_mean(bce_function(x, x_hat))
-    loss = tf.math.reduce_mean(mae_function(x, x_hat))
+    loss = tf.math.reduce_mean(bce_function(x, x_hat) + mse_function(x, x_hat) - 3*tf.math.reduce_variance(x_hat))
     #loss = tf.math.reduce_mean(tf.keras.losses.MeanSquaredError()(x, x_hat))
     #loss = tf.math.reduce_mean(tf.random.normal([2]))
     return loss
@@ -176,10 +176,10 @@ class Autoencoder(tf.keras.Model):
         # ], name='latent')
 
         self.dec5 = Upsample(256, dropout=True)
-        self.dec4 = Upsample(128)
+        self.dec4 = Upsample(128, dropout=True)
         self.dec3 = Upsample(64)
         self.dec2 = Upsample(64)
-        self.dec1 = Upsample(1 if OUTPUT_IS_BW else 3)
+        self.dec1 = Upsample(3)
 
         self.skip = Concatenate()
 
@@ -199,25 +199,19 @@ class Autoencoder(tf.keras.Model):
         e1 = self.enc1(x)
         e2 = self.enc2(e1)
         e3 = self.enc3(e2)
+        #e4 = self.enc4(e3)
+        #e5 = self.enc5(e4)
+
+        #d5 = self.dec5(e5)
+        #skip5 = self.skip([d5, e4])
+        #d4 = self.dec4(skip5)
+        #skip4 = self.skip([d4, e3])
         d3 = self.dec3(e3)
-        d2 = self.dec2(d3)
-        d1 = self.dec1(d2)
-
-        x_hat = self.gen_img(d1)
-        return x_hat
-    
-        e1 = self.enc1(x)
-        e2 = self.enc2(e1)
-        e3 = self.enc3(e2)
-        e4 = self.enc4(e3)
-        e5 = self.enc5(e4)
-
-        d5 = self.dec5(e5)
-        d4 = self.dec4(d5)
-        d3 = self.dec3(d4)
-        d2 = self.dec2(d3)
-        d1 = self.dec1(d2)
-        #skip5 = self.skip([d1, x])
+        skip3 = self.skip([d3, e2])
+        d2 = self.dec2(skip3)
+        skip2 = self.skip([d2, e1])
+        d1 = self.dec1(skip2)
+        #skip1 = self.skip([d1, x])
 
         x_hat = self.gen_img(d1)
 
