@@ -73,7 +73,7 @@ if PRINT_ON == 0: PRINT_ON = 1
 for i in range(len(inputs)):
   inpt = inputs[i]
   style = np.random.choice(styles)
-  fname = 'paintings/'+inpt[:inpt.rfind('.')]+'__'+style[:style.rfind('.')]+'.jpg'
+  fname = 'paintings/'+inpt[:inpt.rfind('.')]+inpt[inpt.rfind('.')+1:]+'__'+style[:style.rfind('.')]+'.jpg'
   save_style_transfer(INPUTS+'/'+inpt, STYLES+'/'+style, fname)
   if i % PRINT_ON == 0:
     sys.stdout.write('\rStyling and saving images -- ')
