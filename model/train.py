@@ -13,8 +13,8 @@ INPUT_IS_BW = False
 OUTPUTS_DIR = "../preprocess/photos_bw"
 OUTPUT_IS_BW = True
 IMAGE_DIM = (192, 128, 3) # 3 color channels
-LEARNING_RATE = 5e-3
-EPOCHS = 15
+LEARNING_RATE = 2e-3
+EPOCHS = 10
 
 def load_images(directory, batch_size=64, color_mode='rgb'):
     data = tf.keras.utils.image_dataset_from_directory(
@@ -142,7 +142,7 @@ class Downsample(tf.keras.Sequential):
     def __init__(self, filters, pool=True):
         super().__init__()
         self.add(Conv2D(filters, 3, padding='same'))
-        self.add(ReLU())
+        self.add(LeakyReLU())
         if pool:
             self.add(MaxPooling2D((2, 2), padding='same'))
 class Upsample(tf.keras.Sequential):
@@ -150,7 +150,7 @@ class Upsample(tf.keras.Sequential):
         super().__init__()
         self.add(Conv2DTranspose(filters, 3, padding='same'))
         self.add(BatchNormalization())
-        self.add(ReLU())
+        self.add(LeakyReLU())
         if unpool:
             self.add(UpSampling2D((2, 2)))
         if dropout:
@@ -175,11 +175,11 @@ class Autoencoder(tf.keras.Model):
         #     Reshape((24, 16, 3)), # after three upsamples will be 192x128
         # ], name='latent')
 
-        self.dec1 = Upsample(256, dropout=True)
-        self.dec2 = Upsample(128)
+        self.dec5 = Upsample(256, dropout=True)
+        self.dec4 = Upsample(128)
         self.dec3 = Upsample(64)
-        self.dec4 = Upsample(64)
-        self.dec5 = Upsample(1 if OUTPUT_IS_BW else 3)
+        self.dec2 = Upsample(64)
+        self.dec1 = Upsample(1 if OUTPUT_IS_BW else 3)
 
         self.skip = Concatenate()
 
@@ -195,6 +195,16 @@ class Autoencoder(tf.keras.Model):
         Returns:
         - x_hat: Reconstructed input data of shape (N, H, W, C)
         """
+
+        e1 = self.enc1(x)
+        e2 = self.enc2(e1)
+        e3 = self.enc3(e2)
+        d3 = self.dec3(e3)
+        d2 = self.dec2(d3)
+        d1 = self.dec1(d2)
+
+        x_hat = self.gen_img(d1)
+        return x_hat
     
         e1 = self.enc1(x)
         e2 = self.enc2(e1)
@@ -202,11 +212,11 @@ class Autoencoder(tf.keras.Model):
         e4 = self.enc4(e3)
         e5 = self.enc5(e4)
 
-        d5 = self.dec1(e5)
-        d4 = self.dec2(d5)
+        d5 = self.dec5(e5)
+        d4 = self.dec4(d5)
         d3 = self.dec3(d4)
-        d2 = self.dec4(d3)
-        d1 = self.dec5(d2)
+        d2 = self.dec2(d3)
+        d1 = self.dec1(d2)
         #skip5 = self.skip([d1, x])
 
         x_hat = self.gen_img(d1)
