@@ -6,6 +6,7 @@ HEIGHT = 192
 WIDTH  = 128
 INPUTS = 'dataset'
 SAVETO = 'photos'
+SAVETOBW = 'photos_bw'
 inputs = os.listdir(INPUTS)
 try:
   inputs.remove('.DS_Store')
@@ -26,6 +27,9 @@ for i in range(len(inputs)):
   out = out.resize((WIDTH, HEIGHT))
   out = out.convert('RGB') # ignore transparency data
   out.save(SAVETO+'/'+inpt)
+  out = out.convert('L')
+  out.save(SAVETOBW+'/'+inpt)
+
   
 
   if (i+1) % PRINT_ON == 0 or i == 0 or i == len(inputs)-1:
