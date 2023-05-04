@@ -14,7 +14,7 @@ OUTPUTS_DIR = "../preprocess/photos_bw"
 OUTPUT_IS_BW = True
 IMAGE_DIM = (192, 128, 3) # 3 color channels
 LEARNING_RATE = 5e-3
-EPOCHS = 20
+EPOCHS = 15
 
 def load_images(directory, batch_size=64, color_mode='rgb'):
     data = tf.keras.utils.image_dataset_from_directory(
@@ -178,15 +178,12 @@ class Autoencoder(tf.keras.Model):
         self.dec1 = Upsample(256, dropout=True)
         self.dec2 = Upsample(128)
         self.dec3 = Upsample(64)
-        self.dec4 = Upsample(32)
+        self.dec4 = Upsample(64)
         self.dec5 = Upsample(1 if OUTPUT_IS_BW else 3)
 
         self.skip = Concatenate()
 
-        self.gen_img = Sequential([
-            Conv2D(1 if OUTPUT_IS_BW else 3, 5, activation='relu', padding='same'),
-            Conv2D(1 if OUTPUT_IS_BW else 3, 3, activation='sigmoid', padding='same')
-        ])
+        self.gen_img = Conv2D(1 if OUTPUT_IS_BW else 3, 5, activation='sigmoid', padding='same')
 
     def call(self, x):
         """
@@ -205,18 +202,14 @@ class Autoencoder(tf.keras.Model):
         e4 = self.enc4(e3)
         e5 = self.enc5(e4)
 
-        d1 = self.dec1(e5)
-        skip1 = self.skip([d1, e4])
-        d2 = self.dec2(skip1)
-        skip2 = self.skip([d2, e3])
-        d3 = self.dec3(skip2)
-        skip3 = self.skip([d3, e2])
-        d4 = self.dec4(skip3)
-        skip4 = self.skip([d4, e1])
-        d5 = self.dec5(skip4)
-        skip5 = self.skip([d5, x])
+        d5 = self.dec1(e5)
+        d4 = self.dec2(d5)
+        d3 = self.dec3(d4)
+        d2 = self.dec4(d3)
+        d1 = self.dec5(d2)
+        #skip5 = self.skip([d1, x])
 
-        x_hat = self.gen_img(skip5)
+        x_hat = self.gen_img(d1)
 
         return x_hat
 
