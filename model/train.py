@@ -8,14 +8,15 @@ from tensorflow.keras.layers import Flatten, Dense, Reshape,\
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
-INPUTS_DIR = "../preprocess/photos_bw"
-INPUT_IS_BW = True
-OUTPUTS_DIR = "../preprocess/photos"
+INPUTS_DIR = "../preprocess/paintings"
+INPUT_IS_BW = False
+OUTPUTS_DIR = "../preprocess/photos_bw"
+OUTPUT_IS_BW = True
 IMAGE_DIM = (192, 128, 3) # 3 color channels
 LEARNING_RATE = 5e-3
-EPOCHS = 5
+EPOCHS = 20
 
-def load_images(directory, batch_size=32, color_mode='rgb'):
+def load_images(directory, batch_size=64, color_mode='rgb'):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
         seed=42, validation_split=0.3, subset='training', color_mode=color_mode
@@ -66,8 +67,13 @@ def show_images(model, x_data, y_data):
                     samples.append(np.tile(xnorm, (1,1,3)))
                 else:
                     samples.append(xnorm)
-                samples.append(model(np.expand_dims(xnorm, axis=0))[0].numpy())
-                samples.append(ynorm)
+                model_out = model(np.expand_dims(xnorm, axis=0))[0].numpy()
+                if OUTPUT_IS_BW:
+                    samples.append(np.tile(model_out, (1,1,3)))
+                    samples.append(np.tile(ynorm, (1,1,3)))
+                else:
+                    samples.append(model_out)
+                    samples.append(ynorm)
             if len(samples) >= 9: break
         if len(samples) >= 9: break
 
@@ -90,10 +96,13 @@ def show_images(model, x_data, y_data):
     plt.close(fig)
 
 def mse_function(x, x_hat):
-    mse_fn = tf.keras.losses.MeanSquaredError(
-        reduction=tf.keras.losses.Reduction.SUM
-    )
+    mse_fn = tf.keras.losses.MeanSquaredError()
     reconstruction_loss = mse_fn(x, x_hat)
+    return reconstruction_loss
+
+def mae_function(x, x_hat):
+    mae_fn = tf.keras.losses.MeanAbsoluteError()
+    reconstruction_loss = mae_fn(x, x_hat)
     return reconstruction_loss
 
 def dkl_function(mu, logvar):
@@ -123,7 +132,8 @@ def loss_function(x, x_hat):
     - loss: Tensor containing the scalar loss for the negative variational lowerbound
     """
     #loss = tf.math.reduce_mean(bce_function(x, x_hat) + dkl_function(mu, logvar))
-    loss = tf.math.reduce_mean(bce_function(x, x_hat))
+    #loss = tf.math.reduce_mean(bce_function(x, x_hat))
+    loss = tf.math.reduce_mean(mae_function(x, x_hat))
     #loss = tf.math.reduce_mean(tf.keras.losses.MeanSquaredError()(x, x_hat))
     #loss = tf.math.reduce_mean(tf.random.normal([2]))
     return loss
@@ -151,9 +161,11 @@ class Autoencoder(tf.keras.Model):
         self.input_size = image_shape[0]*image_shape[1]*image_shape[2]  # H*W*C
         self.latent_size = latent_size  # Z
 
-        self.enc1 = Downsample(32)
+        self.enc1 = Downsample(64)
         self.enc2 = Downsample(64)
         self.enc3 = Downsample(128)
+        self.enc4 = Downsample(256)
+        self.enc5 = Downsample(256)
 
         # self.latent = Sequential([
         #     Input(self.encoder.output_shape[1:]),
@@ -163,13 +175,18 @@ class Autoencoder(tf.keras.Model):
         #     Reshape((24, 16, 3)), # after three upsamples will be 192x128
         # ], name='latent')
 
-        self.dec1 = Upsample(128, dropout=True)
-        self.dec2 = Upsample(64)
-        self.dec3 = Upsample(32)
+        self.dec1 = Upsample(256, dropout=True)
+        self.dec2 = Upsample(128)
+        self.dec3 = Upsample(64)
+        self.dec4 = Upsample(32)
+        self.dec5 = Upsample(1 if OUTPUT_IS_BW else 3)
 
         self.skip = Concatenate()
 
-        self.gen_img = Conv2DTranspose(3, 3, activation='sigmoid', padding='same', use_bias=False)
+        self.gen_img = Sequential([
+            Conv2D(1 if OUTPUT_IS_BW else 3, 5, activation='relu', padding='same'),
+            Conv2D(1 if OUTPUT_IS_BW else 3, 3, activation='sigmoid', padding='same')
+        ])
 
     def call(self, x):
         """
@@ -185,15 +202,21 @@ class Autoencoder(tf.keras.Model):
         e1 = self.enc1(x)
         e2 = self.enc2(e1)
         e3 = self.enc3(e2)
+        e4 = self.enc4(e3)
+        e5 = self.enc5(e4)
 
-        d1 = self.dec1(e3)
-        skip1 = self.skip([d1, e2])
+        d1 = self.dec1(e5)
+        skip1 = self.skip([d1, e4])
         d2 = self.dec2(skip1)
-        skip2 = self.skip([d2, e1])
+        skip2 = self.skip([d2, e3])
         d3 = self.dec3(skip2)
-        skip3 = self.skip([d3, x])
+        skip3 = self.skip([d3, e2])
+        d4 = self.dec4(skip3)
+        skip4 = self.skip([d4, e1])
+        d5 = self.dec5(skip4)
+        skip5 = self.skip([d5, x])
 
-        x_hat = self.gen_img(skip3)
+        x_hat = self.gen_img(skip5)
 
         return x_hat
 
@@ -219,7 +242,7 @@ if __name__ == "__main__":
     model = Autoencoder(IMAGE_DIM)
     print("Loading data")
     x_data = load_images(INPUTS_DIR, color_mode = 'grayscale' if INPUT_IS_BW else 'rgb')
-    y_data = load_images(OUTPUTS_DIR)
+    y_data = load_images(OUTPUTS_DIR, color_mode = 'grayscale' if OUTPUT_IS_BW else 'rgb')
     print("Training model...")
     for e in range(EPOCHS):
         loss = train_epoch(model, x_data, y_data)
