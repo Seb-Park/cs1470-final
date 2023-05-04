@@ -9,7 +9,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
 INPUTS_DIR = "../preprocess/paintings"
-OUTPUTS_DIR = "../preprocess/photos"
+OUTPUTS_DIR = "../preprocess/photos_bw"
 IMAGE_DIM = (192, 128, 3) # 3 color channels
 LEARNING_RATE = 5e-3
 EPOCHS = 5
