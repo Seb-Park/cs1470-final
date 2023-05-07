@@ -13,13 +13,13 @@ INPUT_IS_BW = False
 OUTPUTS_DIR = "../preprocess/photos_bw"
 OUTPUT_IS_BW = True
 IMAGE_DIM = (192, 128, 3) # 3 color channels
-LEARNING_RATE = 4e-3
-EPOCHS = 15
+LEARNING_RATE = 3e-3
+EPOCHS = 5
 
-def load_images(directory, batch_size=64, color_mode='rgb'):
+def load_images(directory, batch_size=128, color_mode='rgb'):
     data = tf.keras.utils.image_dataset_from_directory(
         directory, labels=None, batch_size=batch_size, image_size=(IMAGE_DIM[0],IMAGE_DIM[1]),
-        seed=42, validation_split=0.3, subset='training', color_mode=color_mode
+        seed=42, validation_split=0.1, subset='training', color_mode=color_mode
     )
     return data
 
@@ -179,11 +179,14 @@ class Autoencoder(tf.keras.Model):
         self.dec4 = Upsample(128, dropout=True)
         self.dec3 = Upsample(64)
         self.dec2 = Upsample(64)
-        self.dec1 = Upsample(3)
+        self.dec1 = Upsample(8)
 
         self.skip = Concatenate()
 
-        self.gen_img = Conv2D(1 if OUTPUT_IS_BW else 3, 5, activation='sigmoid', padding='same')
+        self.gen_img = Sequential([
+            Conv2D(3, 5, padding='same'),
+            Conv2D(1 if OUTPUT_IS_BW else 3, 1, activation='sigmoid', padding='same')
+        ])
 
     def call(self, x):
         """
@@ -198,7 +201,7 @@ class Autoencoder(tf.keras.Model):
 
         e1 = self.enc1(x)
         e2 = self.enc2(e1)
-        e3 = self.enc3(e2)
+        #e3 = self.enc3(e2)
         #e4 = self.enc4(e3)
         #e5 = self.enc5(e4)
 
@@ -206,9 +209,9 @@ class Autoencoder(tf.keras.Model):
         #skip5 = self.skip([d5, e4])
         #d4 = self.dec4(skip5)
         #skip4 = self.skip([d4, e3])
-        d3 = self.dec3(e3)
-        skip3 = self.skip([d3, e2])
-        d2 = self.dec2(skip3)
+        #d3 = self.dec3(e3)
+        #skip3 = self.skip([d3, e2])
+        d2 = self.dec2(e2)
         skip2 = self.skip([d2, e1])
         d1 = self.dec1(skip2)
         #skip1 = self.skip([d1, x])

@@ -18,6 +18,6 @@ for i in range(len(inputs)):
   out.save(SAVETO+'/'+inpt)
 
   if (i+1) % PRINT_ON == 0 or i == 0 or i == len(inputs)-1:
-    sys.stdout.write('\rResizing and saving images -- ')
+    sys.stdout.write('\rConverting and saving images -- ')
     sys.stdout.write(str(int((i+1)/len(inputs)*100))+"%")
     sys.stdout.flush()
