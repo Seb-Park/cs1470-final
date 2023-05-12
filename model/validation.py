@@ -45,8 +45,56 @@ def show_image(model, x_dir):
     plt.savefig("show_val_image.pdf", bbox_inches="tight")
     plt.show()
 
+def val_model(model, val_x, val_true):
+    acc_list = []
+    for file in os.listdir(val_x):
+        lowercased = file.lower()
+        if(lowercased.endswith((".jpg", ".jpeg", ".png"))):
+            pic = np.array(Image.open(val_x + "/" + file)) / 255.0
+            actual = np.array(Image.open(val_true + "/" + file)) / 255.0
+            model_out = model(np.expand_dims(pic, axis=0))[0].numpy()
+            if OUTPUT_IS_BW:
+                model_out = np.tile(model_out, (1,1,3))
+            samples = [pic, model_out, actual]
+
+            flattened_out = model_out.flatten()
+            flattened_true = actual.flatten()
+            # flattened_true = [1 for _ in flattened_out]
+            # flattened_out = [1 for _ in flattened_out]
+
+            squared_errors = [(o - t)**2 for o, t in zip(flattened_out, flattened_true)]
+
+            per_pixel_accuracies = [(1-e)**10 for e in squared_errors]
+            
+            acc_of_img = sum(per_pixel_accuracies)/len(per_pixel_accuracies)
+
+            acc_list.append(acc_of_img)
+            print(f"Accuracy of {file}: {acc_of_img}")
+
+            # # Visualize
+            # fig = plt.figure(figsize=(3, 1))
+            # gspec = gridspec.GridSpec(1, 3)
+            # gspec.update(wspace=0.4, hspace=0.4)
+            # for i, sample in enumerate(samples):
+            #     ax = plt.subplot(gspec[i])
+            #     plt.axis("off")
+            #     ax.set_xticklabels([])
+            #     ax.set_yticklabels([])
+            #     ax.set_aspect("equal")
+            #     sample *= 255
+            #     sample = sample.astype('int32')
+            #     plt.imshow(sample)
+
+            # # Save the generated images
+            # plt.savefig(val_x + "/res/" + file, bbox_inches="tight")
+            # plt.show()
+    final_acc = sum(acc_list)/len(acc_list)
+    print(f"Final Accuracy: {final_acc}")
+            
+
 if __name__ == '__main__':
     model = Autoencoder(IMAGE_DIM)
     model.build(input_shape = (None, 192, 128, 3))
     model.load_weights('./ckpts/model_ckpts')
-    show_image(model, INPUT)
+    # show_image(model, INPUT)
+    val_model(model, "../preprocess/val_x", "../preprocess/val_true")
