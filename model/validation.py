@@ -87,7 +87,7 @@ def val_model(model, val_x, val_true):
 
             squared_errors = [(o - t)**2 for o, t in zip(flattened_out, flattened_true)]
 
-            per_pixel_accuracies = [(1-e)**10 for e in squared_errors]
+            per_pixel_accuracies = [(1-e)**5 for e in squared_errors]
             
             acc_of_img = sum(per_pixel_accuracies)/len(per_pixel_accuracies)
 
