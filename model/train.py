@@ -14,7 +14,7 @@ OUTPUTS_DIR = "../preprocess/photos_bw"
 OUTPUT_IS_BW = True
 IMAGE_DIM = (192, 128, 3) # 3 color channels
 LEARNING_RATE = 3e-3
-EPOCHS = 5
+EPOCHS = 10
 
 def load_images(directory, batch_size=128, color_mode='rgb'):
     data = tf.keras.utils.image_dataset_from_directory(
@@ -131,9 +131,10 @@ def loss_function(x, x_hat):
     Returns:
     - loss: Tensor containing the scalar loss for the negative variational lowerbound
     """
+    variance_bias = 3
     #loss = tf.math.reduce_mean(bce_function(x, x_hat) + dkl_function(mu, logvar))
     #loss = tf.math.reduce_mean(bce_function(x, x_hat))
-    loss = tf.math.reduce_mean(bce_function(x, x_hat) + mse_function(x, x_hat) - 3*tf.math.reduce_variance(x_hat))
+    loss = tf.math.reduce_mean(bce_function(x, x_hat) + mse_function(x, x_hat) - variance_bias*tf.math.reduce_variance(x_hat))
     #loss = tf.math.reduce_mean(tf.keras.losses.MeanSquaredError()(x, x_hat))
     #loss = tf.math.reduce_mean(tf.random.normal([2]))
     return loss
