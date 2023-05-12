@@ -46,6 +46,7 @@ def show_image(model, x_dir):
     plt.show()
 
 def val_model(model, val_x, val_true):
+    np.random.seed(42)
     acc_list = []
     for file in os.listdir(val_x):
         lowercased = file.lower()
@@ -73,7 +74,16 @@ def val_model(model, val_x, val_true):
             flattened_true = actual.flatten()
             # print(flattened_true.shape)
             # flattened_true = [1 for _ in flattened_out]
-            # flattened_out = [1 for _ in flattened_out]
+            ##### Uncomment for default grayscale
+            # flattened_out = [0.5 for _ in flattened_out]
+            ##### Uncomment for random sample
+            # flattened_out = np.random.random_sample([len(flattened_out)])
+            #####
+            # print(f"old length: {len(flattened_out)}")
+            # flattened_out = np.random.normal(0.5, 0.5, len(flattened_out))
+            # print(f"length: {len(flattened_out)}")
+            # print(f"max {np.max(flattened_out)}")
+            # print(f"min {np.min(flattened_out)}")
 
             squared_errors = [(o - t)**2 for o, t in zip(flattened_out, flattened_true)]
 
