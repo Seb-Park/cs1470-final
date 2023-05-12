@@ -97,7 +97,7 @@ def val_model(model, val_x, val_true):
 
             # Save the generated images
             plt.savefig(val_x + "/res/" + file, bbox_inches="tight")
-            plt.show()
+            # plt.show()
     final_acc = sum(acc_list)/len(acc_list)
     print(f"Final Accuracy: {final_acc}")
             
