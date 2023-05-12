@@ -57,13 +57,16 @@ def val_model(model, val_x, val_true):
             model_out = model(np.expand_dims(pic, axis=0))[0].numpy()
             if OUTPUT_IS_BW:
                 model_out = np.tile(model_out, (1,1,3))
-            samples = [pic, model_out, actual]
 
             # print(model_out.shape)
             # print(model_out)
             model_colorless = np.transpose(model_out, (2, 0, 1))[0]
             # print(f"Unsquizen dimension: {model_out.shape}")
             # print(f"squizen {model_colorless.shape}")
+
+            actual_colorspace = np.expand_dims(actual, axis=-1) * np.ones((1, 1, 3), dtype=int)
+
+            samples = [pic, model_out, actual_colorspace]
 
             flattened_out = model_colorless.flatten()
             # print(flattened_out.shape)
@@ -79,7 +82,7 @@ def val_model(model, val_x, val_true):
             acc_of_img = sum(per_pixel_accuracies)/len(per_pixel_accuracies)
 
             acc_list.append(acc_of_img)
-            print(f"Accuracy of {file}: {acc_of_img}")
+            print(f"Accuracy of ({file}): {acc_of_img}")
 
             # Visualize
             fig = plt.figure(figsize=(3, 1))
@@ -97,6 +100,7 @@ def val_model(model, val_x, val_true):
 
             # Save the generated images
             plt.savefig(val_x + "/res/" + file, bbox_inches="tight")
+            plt.close()
             # plt.show()
     final_acc = sum(acc_list)/len(acc_list)
     print(f"Final Accuracy: {final_acc}")
