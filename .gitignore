@@ -9,6 +9,8 @@ preprocess/paintings/*
 preprocess/photos/*
 preprocess/photos_bw/*
 preprocess/ckpts/*
+preprocess/val_true/*
+preprocess/val_x/*
 model/ckpts/*
 
 ### macOS ###

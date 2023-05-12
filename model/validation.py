@@ -52,13 +52,23 @@ def val_model(model, val_x, val_true):
         if(lowercased.endswith((".jpg", ".jpeg", ".png"))):
             pic = np.array(Image.open(val_x + "/" + file)) / 255.0
             actual = np.array(Image.open(val_true + "/" + file)) / 255.0
+            # print(actual.shape)
+            # print(pic.shape)
             model_out = model(np.expand_dims(pic, axis=0))[0].numpy()
             if OUTPUT_IS_BW:
                 model_out = np.tile(model_out, (1,1,3))
             samples = [pic, model_out, actual]
 
-            flattened_out = model_out.flatten()
+            # print(model_out.shape)
+            # print(model_out)
+            model_colorless = np.transpose(model_out, (2, 0, 1))[0]
+            # print(f"Unsquizen dimension: {model_out.shape}")
+            # print(f"squizen {model_colorless.shape}")
+
+            flattened_out = model_colorless.flatten()
+            # print(flattened_out.shape)
             flattened_true = actual.flatten()
+            # print(flattened_true.shape)
             # flattened_true = [1 for _ in flattened_out]
             # flattened_out = [1 for _ in flattened_out]
 
@@ -71,26 +81,34 @@ def val_model(model, val_x, val_true):
             acc_list.append(acc_of_img)
             print(f"Accuracy of {file}: {acc_of_img}")
 
-            # # Visualize
-            # fig = plt.figure(figsize=(3, 1))
-            # gspec = gridspec.GridSpec(1, 3)
-            # gspec.update(wspace=0.4, hspace=0.4)
-            # for i, sample in enumerate(samples):
-            #     ax = plt.subplot(gspec[i])
-            #     plt.axis("off")
-            #     ax.set_xticklabels([])
-            #     ax.set_yticklabels([])
-            #     ax.set_aspect("equal")
-            #     sample *= 255
-            #     sample = sample.astype('int32')
-            #     plt.imshow(sample)
+            # Visualize
+            fig = plt.figure(figsize=(3, 1))
+            gspec = gridspec.GridSpec(1, 3)
+            gspec.update(wspace=0.4, hspace=0.4)
+            for i, sample in enumerate(samples):
+                ax = plt.subplot(gspec[i])
+                plt.axis("off")
+                ax.set_xticklabels([])
+                ax.set_yticklabels([])
+                ax.set_aspect("equal")
+                sample *= 255
+                sample = sample.astype('int32')
+                plt.imshow(sample)
 
-            # # Save the generated images
-            # plt.savefig(val_x + "/res/" + file, bbox_inches="tight")
-            # plt.show()
+            # Save the generated images
+            plt.savefig(val_x + "/res/" + file, bbox_inches="tight")
+            plt.show()
     final_acc = sum(acc_list)/len(acc_list)
     print(f"Final Accuracy: {final_acc}")
             
+def resize_dir(dir):
+    for file in os.listdir(dir):
+        lowercased = file.lower()
+        if(lowercased.endswith((".jpg", ".jpeg", ".png"))):
+            f_img = dir+"/"+file
+            img = Image.open(f_img)
+            img = img.resize((128,192))
+            img.save(f_img)
 
 if __name__ == '__main__':
     model = Autoencoder(IMAGE_DIM)
@@ -98,3 +116,4 @@ if __name__ == '__main__':
     model.load_weights('./ckpts/model_ckpts')
     # show_image(model, INPUT)
     val_model(model, "../preprocess/val_x", "../preprocess/val_true")
+    # resize_dir("../preprocess/val_x")
